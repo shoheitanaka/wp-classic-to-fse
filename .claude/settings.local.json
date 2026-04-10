@@ -5,7 +5,13 @@
       "Bash(cp -r /Users/shoheitanaka/Dev/antimall/assets/font /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/font)",
       "Bash(cp /Users/shoheitanaka/Dev/antimall/assets/netbase/css/main.css /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/css/main.css)",
       "Bash(cp /Users/shoheitanaka/Dev/antimall/assets/netbase/css/main.min.css /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/css/main.min.css)",
-      "Bash(cp /Users/shoheitanaka/Dev/antimall/assets/netbase/js/main.js /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/js/main.js)"
+      "Bash(cp /Users/shoheitanaka/Dev/antimall/assets/netbase/js/main.js /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/js/main.js)",
+      "Bash(node:*)",
+      "Bash(curl -s -X POST -H 'Authorization: Basic __TRACKED_VAR__' -F theme=@converted-theme.zip __TRACKED_VAR__/wp-json/fse-conversion/v1/upload-theme)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Basic __TRACKED_VAR__' __TRACKED_VAR__/wp-json/fse-conversion/v1/__TRACKED_VAR__)",
+      "Bash(curl -s -H 'Authorization: Basic __TRACKED_VAR__' __TRACKED_VAR__/wp-json/fse-conversion/v1/customizer-export)",
+      "Bash(curl -s -H 'Authorization: Basic __TRACKED_VAR__' __TRACKED_VAR__/wp-json/fse-conversion/v1/capture-urls)",
+      "Bash(npx tsx:*)"
     ]
   }
 }
