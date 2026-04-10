@@ -1,0 +1,19 @@
+{
+  "name": "wp-classic-to-fse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WordPress Classic Theme to FSE Theme conversion agent for Claude Code",
+  "scripts": {
+    "capture": "tsx scripts/capture.ts",
+    "diff": "tsx scripts/diff.ts",
+    "visual-check": "npm run capture && npm run diff"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "pixelmatch": "^6.0.0",
+    "playwright": "^1.50.0",
+    "pngjs": "^7.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}

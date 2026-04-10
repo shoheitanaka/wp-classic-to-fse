@@ -1,0 +1,10 @@
+{
+  "stagingUrl": "https://staging.example.com",
+  "apiUser": "admin",
+  "apiPassword": "xxxx xxxx xxxx xxxx xxxx xxxx",
+  "basicAuthUser": "",
+  "basicAuthPass": "",
+  "classicTheme": "theme-name",
+  "fseTheme": "converted-theme",
+  "outputDir": "./visual-diff"
+}

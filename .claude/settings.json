@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Read(*)",
+      "Write(converted-theme/**)",
+      "Write(CONVERSION_REPORT.md)"
+    ],
+    "deny": [
+      "Write($ARGUMENTS/**)"
+    ]
+  }
+}
