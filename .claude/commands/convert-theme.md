@@ -65,15 +65,106 @@
 - エンキュー処理のパスを更新
 - Google Fonts を可能な限り `theme.json` fontFamilies に移行
 
-### Step 8: ビジュアル検証（VISUAL_VERIFICATION_SKILL.md 参照）
-1. wp-env でクラシックテーマ（port 8881）とFSEテーマ（port 8882）を並列起動
-2. 両環境に同一テストデータを投入
-3. Playwright で全ページ × 全ビューポートのスクリーンショット + Computed Style を取得
-4. ピクセル差分とスタイル値差分を解析
-5. 差分レポートをユーザーに提示し確認を得る
-6. Critical/Warning の差異を theme.json / style.css で修正
-7. 再キャプチャ → 再比較（最大5ループ、閾値: ピクセル差分率 < 2%）
-8. 最終ビジュアル差分レポートを生成
+### Step 8: ビジュアル検証 + 自動修正ループ（ステージング方式）
+
+capture-config.json が存在するか確認し、なければユーザーに作成を案内する。
+
+#### 8-1. カスタマイザー設定の取得と theme.json への反映
+```bash
+npm run capture
+```
+実行前に REST API 経由でカスタマイザー設定をエクスポートし `visual-diff/exports/` に保存する。
+出力された `customizer.json` の内容を読み取り、以下を theme.json に反映する:
+- `theme_mods.header_textcolor` → `styles.elements.heading.color`
+- `theme_mods.background_color` → `styles.color.background`
+- `editor-color-palette` の値 → `settings.color.palette`
+- `editor-font-sizes` の値 → `settings.typography.fontSizes`
+- カスタムロゴのサイズ → `parts/header.html` の `wp:site-logo` 属性
+- ウィジェット構成 → `parts/sidebar.html` のブロック構造
+- メニュー構造 → `wp:navigation` の構造
+
+#### 8-2. 変換済みテーマを ZIP 化しステージングにアップロード
+```bash
+cd converted-theme && zip -r ../converted-theme.zip . && cd ..
+curl -u "$API_USER:$API_PASS" \
+  -F "theme=@converted-theme.zip" \
+  $STAGING_URL/wp-json/fse-conversion/v1/upload-theme
+```
+
+#### 8-3. Playwright キャプチャ実行
+```bash
+npm run capture
+```
+Classic 状態 → スクショ + Computed Style → テーマ切替 → FSE 状態 → スクショ + Computed Style → Classic に戻す
+
+#### 8-4. 差分解析
+```bash
+npm run diff
+```
+`visual-diff/diff-report.json` と `visual-diff/VISUAL_DIFF_REPORT.md` が生成される。
+
+#### 8-5. 差分レポートを読み取り、自動修正ループに入る
+
+`visual-diff/diff-report.json` を読み取り、以下のルールで自動修正する。
+**ユーザー確認不要 — critical/warning は自動で修正して再検証する。**
+
+##### 修正ルール（diff-report.json の fixSuggestions に基づく）
+
+1. **font-size 差異** → `converted-theme/theme.json`
+   - diff の selector がどの要素/ブロックに対応するか判定
+   - `h1`〜`h6` → `styles.elements.h1.typography.fontSize` 等を Classic 値に設定
+   - `.entry-content p` 等 → `styles.blocks.core/paragraph.typography.fontSize`
+   - 該当なければ `converted-theme/style.css` に直接ルール追加
+
+2. **margin/padding 差異** → `converted-theme/theme.json` or `style.css`
+   - `styles.spacing` または `styles.blocks.{block}.spacing.margin/padding` を設定
+   - theme.json で表現できない複雑なセレクタは `style.css` に追加
+
+3. **color 差異** → `converted-theme/theme.json`
+   - `settings.color.palette` に不足している色を追加
+   - `styles.elements.{element}.color.text/background` を設定
+
+4. **layout 差異（display, width, position）** → テンプレート構造を修正
+   - `converted-theme/templates/*.html` または `parts/*.html` のブロック構造を修正
+   - コンテナブロックの `layout` 属性、alignWide/alignFull 設定を調整
+
+5. **要素欠落** → テンプレート/パーツにブロックを追加
+
+6. **font-family 差異** → `theme.json` の `settings.typography.fontFamilies` を確認・修正
+
+##### 修正後の再検証
+
+修正が完了したら:
+1. `converted-theme` を再 ZIP 化
+2. REST API でステージングにアップロード（上書き）
+3. `npm run capture` で再キャプチャ
+4. `npm run diff` で再比較
+5. `diff-report.json` を再読み取り
+
+##### ループ終了条件
+- **成功**: 全ページのピクセル差分率 < 2% かつ critical が 0件
+- **上限**: 5回ループしても閾値未達の場合、残存差異を VISUAL_DIFF_REPORT.md に記録して終了
+- **各ループで**: 修正内容のサマリーをコンソールに出力（何を変えたか追跡可能にする）
+
+##### 修正ログ
+各ループの修正内容を `visual-diff/fix-log.json` に記録する:
+```json
+[
+  {
+    "loop": 1,
+    "fixes": [
+      { "file": "theme.json", "path": "styles.elements.h1.typography.fontSize", "from": null, "to": "36px", "reason": "h1 font-size diff: 36px vs 32px" },
+      { "file": "style.css", "added": ".entry-content { margin-top: 40px; }", "reason": "margin-top diff: 40px vs 0px" }
+    ],
+    "result": { "pixelDiffMax": 4.2, "criticals": 3, "warnings": 8 }
+  },
+  {
+    "loop": 2,
+    "fixes": [...],
+    "result": { "pixelDiffMax": 1.1, "criticals": 0, "warnings": 2 }
+  }
+]
+```
 
 ### Step 9: 出力
 - 変換結果を `./converted-theme/` ディレクトリに出力（元テーマは変更しない）

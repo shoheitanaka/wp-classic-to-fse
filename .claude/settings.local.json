@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp -r /Users/shoheitanaka/Dev/antimall/assets/vendor /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/vendor)",
+      "Bash(cp -r /Users/shoheitanaka/Dev/antimall/assets/font /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/font)",
+      "Bash(cp /Users/shoheitanaka/Dev/antimall/assets/netbase/css/main.css /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/css/main.css)",
+      "Bash(cp /Users/shoheitanaka/Dev/antimall/assets/netbase/css/main.min.css /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/css/main.min.css)",
+      "Bash(cp /Users/shoheitanaka/Dev/antimall/assets/netbase/js/main.js /Users/shoheitanaka/Dev/wp-classic-to-fse/converted-theme/assets/js/main.js)"
+    ]
+  }
+}
