@@ -4,9 +4,11 @@
   "private": true,
   "description": "WordPress Classic Theme to FSE Theme conversion agent for Claude Code",
   "scripts": {
+    "extract": "tsx scripts/extract-html.ts",
     "capture": "tsx scripts/capture.ts",
+    "capture:no-export": "tsx scripts/capture-no-export.ts",
     "diff": "tsx scripts/diff.ts",
-    "visual-check": "npm run capture && npm run diff",
+    "visual-check": "npm run capture:no-export && npm run diff",
     "deploy": "tsx scripts/deploy.ts",
     "deploy:no-bump": "tsx scripts/deploy.ts --no-bump"
   },

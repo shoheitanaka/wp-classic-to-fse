@@ -2,175 +2,267 @@
 
 対象テーマディレクトリ: $ARGUMENTS
 
+## 基本方針：HTML-First アプローチ
+
+**PHPコードを先に読んで変換するのではなく、ステージングの実レンダリングHTMLを設計の第一参照とする。**
+
+```
+❌ 旧アプローチ: PHP → 意図を解釈 → FSEブロック → ズレが生じる
+✅ 新アプローチ: 実DOM・実スタイル → FSEブロック → PHPで動的部分を補完
+```
+
+理由：
+- `antimall_get_header()` 等の複雑なフレームワーク関数はPHP読解では追いきれない
+- カスタマイザー値・条件分岐・フィルターが絡んだ実際の出力はレンダリングして初めてわかる
+- 実DOMを参照すれば推測ゼロで正確なCSS値・HTML構造が取得できる
+
+---
+
 ## 実行手順
 
-### Step 1: テーマ解析
-- ディレクトリ構造をスキャンし、全ファイルを一覧化
-- `style.css` のテーマヘッダーを抽出
-- `functions.php` を完全解析:
-  - `add_theme_support()` 一覧
-  - `register_nav_menus()` / `register_sidebar()` 一覧
-  - `wp_enqueue_script()` / `wp_enqueue_style()` 一覧
-  - カスタム投稿タイプ・タクソノミー登録
-  - カスタマイザー設定
-- 各テンプレートファイル内のPHPロジックをスキャンし、CLAUDE.md の4カテゴリ（A〜D）に分類
+### Step 1: HTML抽出（最初に必ず実行）
 
-### Step 2: 変換計画の提示
-解析結果をもとに変換計画をユーザーに提示し、確認を得る:
-- ファイル別の変換方針一覧（元ファイル → 出力先 + 処理方式）
-- PHPロジックの分類結果サマリー
-- 検出された課題・リスク
-- 変換不可項目（カテゴリD）の一覧
+`capture-config.json` が存在することを確認し、なければユーザーに作成を案内して中断。
 
-**ユーザーの確認を得てから Step 3 に進む。**
+```bash
+npm run extract
+```
 
-### Step 3: theme.json 生成
-- `functions.php` の `add_theme_support()` から settings を生成
-- CSSカスタムプロパティからパレット・フォント・スペーシングを抽出
-- グローバルCSS から styles セクションを生成
-- templateParts / customTemplates を宣言
+このスクリプトは以下を実行する：
+- ステージングにクラシックテーマで接続
+- 全ページの完全DOM + 計算済みスタイルを取得
+- `visual-diff/html/classic/` に保存：
+  - `{page}.html` — フルページHTML
+  - `{page}-structure.json` — 要素別の計算済みスタイル
+  - `{page}-guide.md` — ページ別の変換ガイド
+  - `extraction-summary.md` — 全体サマリー（最重要）
 
-### Step 4: テンプレートパーツ変換
-以下の順序で変換:
-1. `header.php` → `parts/header.html`
-   - 埋め込みPHPロジックをカテゴリ判定し、ブロック化/パターン化/functions.php移行
-2. `footer.php` → `parts/footer.html`
-3. `sidebar.php` → `parts/sidebar.html` またはパターン
+**抽出完了後、必ず以下を読む：**
+```
+visual-diff/html/classic/extraction-summary.md   ← グローバルスタイル基準値・ヘッダー構造
+visual-diff/html/classic/front-page-guide.md      ← フロントページ詳細
+```
 
-### Step 5: テンプレート変換
-以下の順序で変換:
-1. `index.php` → `templates/index.html`
-2. `single.php` → `templates/single.html`
-3. `page.php` → `templates/page.html`
-4. `archive.php` → `templates/archive.html`
-5. `search.php` → `templates/search.html`
-6. `404.php` → `templates/404.html`
-7. その他検出されたテンプレート
+### Step 2: 実DOM解析（PHPより先に行う）
 
-各テンプレートで:
-- PHPテンプレートタグ → ブロックマークアップに変換
-- `is_*()` 条件分岐 → テンプレート階層分割 or functions.php移行
-- カスタムループ → wp:query ブロック or パターン化
-- インラインPHPロジック → カテゴリ判定し適切に処理
+`extraction-summary.md` と各ページの `-guide.md` を読み、以下を把握する：
 
-### Step 6: PHPロジック移行
-- カテゴリB のコードを `patterns/*.php` に配置
-- カテゴリC のコードを `functions.php` に統合
-  - 適切なアクション/フィルターフックにアタッチ
-  - 必要に応じてダイナミックブロックとして `register_block_type()` で登録
-- 不要になった `add_theme_support()` 等を functions.php から削除
+**グローバル基準値の確定：**
+- `body { font-family, font-size, line-height, color, background-color }` の実測値
+- → これが `theme.json styles.typography` と `styles.color` の正解値
 
-### Step 7: アセット整理
+**ヘッダー構造の確定：**
+- `header` 要素の実DOM（子要素・クラス・高さ・背景色）
+- ナビゲーションのメニュー項目・階層構造
+- ロゴのサイズ・位置
+
+**フッター構造の確定：**
+- `footer` 要素の実DOM（カラム数・配色・コンテンツ）
+
+**各テンプレートタイプの確定：**
+- 実際に存在する要素セレクタを把握（`.site-header` か `#masthead` か等）
+- サイドバーの有無・位置（左/右）
+
+### Step 3: PHPコード確認（動的部分のみ）
+
+実DOMで構造が把握できたら、PHPは以下の確認にのみ使用する：
+
+**確認事項：**
+1. `register_nav_menus()` → ナビゲーションのメニューロケーション名とDBのID
+2. `register_sidebar()` → サイドバーのスラッグ
+3. カスタム投稿タイプ・タクソノミー → archive/single テンプレートの分岐
+4. `functions.php` の `wp_enqueue_*` → 必要なJS/CSSアセット
+5. 変換不可なプラグイン依存（WooCommerce、Revolution Slider等）→ カテゴリD として記録
+
+**PHPを読む必要がないもの：**
+- ヘッダー・フッターの見た目（実DOMで確認済み）
+- CSS値・カラー（実スタイルで確認済み）
+- レイアウト構造（実DOMで確認済み）
+
+### Step 4: 変換計画の提示
+
+解析結果をもとに変換計画をユーザーに提示し、確認を得る：
+
+- **グローバルスタイル**: 実測値（`body font-size`, `color` 等）の一覧
+- **テンプレートパーツ**: ヘッダー・フッター・サイドバーの実構造サマリー
+- **テンプレート**: 必要なファイル一覧と各テンプレートの方針
+- **変換不可項目**: カテゴリD（プラグイン依存、動的コンテンツ等）
+
+**ユーザーの確認を得てから Step 5 に進む。**
+
+### Step 5: theme.json 生成（実測値ベース）
+
+`extraction-summary.md` の値を最優先で使用する：
+
+```
+優先順位:
+1位: extraction-summary.md の実測計算済みスタイル
+2位: functions.php の add_theme_support() / editor-color-palette
+3位: style.css の CSS カスタムプロパティ
+```
+
+**設定内容：**
+- `styles.typography`: body の実測 font-family / font-size / line-height / color
+- `settings.color.palette`: 実DOM上で計測された実際のカラー値
+- `settings.layout.contentSize`: 実 `.container` または main 要素の実測 max-width
+- `styles.elements.h1〜h6`: 実測フォントサイズ・マージン
+
+### Step 6: テンプレートパーツ変換（実DOM基準）
+
+`{page}-guide.md` の HTML プレビューと子要素リストを参照して設計する。
+
+#### parts/header.html
+
+`front-page-guide.md` の `header 要素` セクションを読み：
+- 実際の子要素（topbar / logo-section / nav-section 等）の順序・構造を再現
+- 背景色・パディングは実測値をそのまま使用
+- ナビゲーション ID は PHPコードまたは MCP で確認
+
+#### parts/footer.html
+
+`front-page-guide.md` の `footer 要素` セクションを読み：
+- カラム数・比率は実測レイアウトに合わせる
+- 背景色・テキスト色は実測値を使用
+- コンテンツ（住所・ウィジェット）はプレースホルダーでOK
+
+#### parts/sidebar.html
+
+`{page}-guide.md` の `sidebar 要素` セクションを読み：
+- ウィジェット構成（最新記事・カテゴリ等）を再現
+
+### Step 7: テンプレート変換
+
+各テンプレートを `{page}-guide.md` と実DOM構造を参照して変換する：
+
+| PHPテンプレート | FSEテンプレート | 参照するguide |
+|---------------|----------------|-------------|
+| `front-page.php` / 固定フロントページ | `templates/front-page.html` | `front-page-guide.md` |
+| `index.php` | `templates/index.html` | `category-news-guide.md` |
+| `single.php` | `templates/single.html` | `single-with-thumbnail-guide.md` |
+| `page.php` | `templates/page.html` | `page-buy-form-guide.md` |
+| `archive.php` | `templates/archive.html` | `archive-*-guide.md` |
+| `search.php` | `templates/search.html` | `search-results-guide.md` |
+| `404.php` | `templates/404.html` | `404-guide.md` |
+
+**front-page.html の特別ルール：**
+- 固定フロントページが WooCommerce / Revolution Slider 等のショートコードで構成されている場合は `wp:post-content` を使わない
+- `front-page-guide.md` の実HTMLを基に、各セクションをFSEブロックで再構築する
+- VC shortcode (`[vc_row]`, `[rev_slider_vc]` 等) は カテゴリD として記録し、カバーブロック等で代替する
+
+### Step 8: アセット整理
+
 - CSS/JS/画像/フォントを `assets/` に再配置
-- エンキュー処理のパスを更新
-- Google Fonts を可能な限り `theme.json` fontFamilies に移行
+- Google Fonts を `theme.json fontFamilies` に移行（実測 font-family 名を使用）
+- フォントアイコン（fontello等）は `functions.php` でエンキュー
 
-### Step 8: ビジュアル検証 + 自動修正ループ（ステージング方式）
+### Step 9: 初回デプロイ
 
-capture-config.json が存在するか確認し、なければユーザーに作成を案内する。
-
-#### 8-1. カスタマイザー設定の取得と theme.json への反映
 ```bash
-npm run capture
-```
-実行前に REST API 経由でカスタマイザー設定をエクスポートし `visual-diff/exports/` に保存する。
-出力された `customizer.json` の内容を読み取り、以下を theme.json に反映する:
-- `theme_mods.header_textcolor` → `styles.elements.heading.color`
-- `theme_mods.background_color` → `styles.color.background`
-- `editor-color-palette` の値 → `settings.color.palette`
-- `editor-font-sizes` の値 → `settings.typography.fontSizes`
-- カスタムロゴのサイズ → `parts/header.html` の `wp:site-logo` 属性
-- ウィジェット構成 → `parts/sidebar.html` のブロック構造
-- メニュー構造 → `wp:navigation` の構造
-
-#### 8-2. 変換済みテーマを ZIP 化しステージングにアップロード
-```bash
-cd converted-theme && zip -r ../converted-theme.zip . && cd ..
-curl -u "$API_USER:$API_PASS" \
-  -F "theme=@converted-theme.zip" \
-  $STAGING_URL/wp-json/fse-conversion/v1/upload-theme
+npm run deploy
 ```
 
-#### 8-3. Playwright キャプチャ実行
-```bash
-npm run capture
-```
-Classic 状態 → スクショ + Computed Style → テーマ切替 → FSE 状態 → スクショ + Computed Style → Classic に戻す
+### Step 10: ビジュアル検証 + 自動修正ループ
 
-#### 8-4. 差分解析
+#### 10-1. キャプチャ
+
+```bash
+npm run capture:no-export
+```
+
+Classic 状態 → スクショ + Computed Style → テーマ切替 → FSE → スクショ → Classic に戻す
+
+#### 10-2. 差分解析
+
 ```bash
 npm run diff
 ```
+
 `visual-diff/diff-report.json` と `visual-diff/VISUAL_DIFF_REPORT.md` が生成される。
 
-#### 8-5. 差分レポートを読み取り、自動修正ループに入る
+#### 10-3. 差分レポートを読み取り、自動修正ループに入る
 
 `visual-diff/diff-report.json` を読み取り、以下のルールで自動修正する。
-**ユーザー確認不要 — critical/warning は自動で修正して再検証する。**
+**ユーザー確認不要 — critical は自動で修正して再検証する。**
 
-##### 修正ルール（diff-report.json の fixSuggestions に基づく）
+##### 修正ルール
 
-1. **font-size 差異** → `converted-theme/theme.json`
-   - diff の selector がどの要素/ブロックに対応するか判定
-   - `h1`〜`h6` → `styles.elements.h1.typography.fontSize` 等を Classic 値に設定
-   - `.entry-content p` 等 → `styles.blocks.core/paragraph.typography.fontSize`
-   - 該当なければ `converted-theme/style.css` に直接ルール追加
+1. **font-size / color / spacing 差異**
+   - `extraction-summary.md` の実測値と照合して theme.json / style.css を修正
+   - 実測値と diff の両方が一致する値を採用する
 
-2. **margin/padding 差異** → `converted-theme/theme.json` or `style.css`
-   - `styles.spacing` または `styles.blocks.{block}.spacing.margin/padding` を設定
-   - theme.json で表現できない複雑なセレクタは `style.css` に追加
+2. **要素欠落**（`.site-header` 等のクラシック固有クラス）
+   - FSEではHTML構造が異なるため、クラシック固有クラスの欠落は「構造的差異」として記録
+   - 機能的に同等であれば修正不要
 
-3. **color 差異** → `converted-theme/theme.json`
-   - `settings.color.palette` に不足している色を追加
-   - `styles.elements.{element}.color.text/background` を設定
+3. **layout 差異**（width, height のずれ）
+   - `theme.json settings.layout.contentSize` で調整
+   - または `parts/*.html` のブロック構造を修正
 
-4. **layout 差異（display, width, position）** → テンプレート構造を修正
-   - `converted-theme/templates/*.html` または `parts/*.html` のブロック構造を修正
-   - コンテナブロックの `layout` 属性、alignWide/alignFull 設定を調整
-
-5. **要素欠落** → テンプレート/パーツにブロックを追加
-
-6. **font-family 差異** → `theme.json` の `settings.typography.fontFamilies` を確認・修正
+4. **要素位置のずれ**（rect_y の差異）
+   - コンテンツの差異（VC shortcode vs FSE blocks）によるものは修正不要として記録
+   - ヘッダー・フッターのずれは parts/*.html を修正
 
 ##### 修正後の再検証
 
-修正が完了したら:
-1. `converted-theme` を再 ZIP 化
-2. REST API でステージングにアップロード（上書き）
-3. `npm run capture` で再キャプチャ
-4. `npm run diff` で再比較
-5. `diff-report.json` を再読み取り
+修正が完了したら：
+1. `npm run deploy` で再デプロイ（バージョン自動インクリメント）
+2. `npm run capture:no-export` で再キャプチャ
+3. `npm run diff` で再比較
+4. `diff-report.json` を再読み取り
 
 ##### ループ終了条件
 - **成功**: 全ページのピクセル差分率 < 2% かつ critical が 0件
-- **上限**: 5回ループしても閾値未達の場合、残存差異を VISUAL_DIFF_REPORT.md に記録して終了
-- **各ループで**: 修正内容のサマリーをコンソールに出力（何を変えたか追跡可能にする）
+- **上限**: 5回ループしても閾値未達の場合、残存差異を `VISUAL_DIFF_REPORT.md` に記録して終了
+- **各ループで**: 修正内容のサマリーを出力（何を変えたか追跡可能にする）
 
 ##### 修正ログ
-各ループの修正内容を `visual-diff/fix-log.json` に記録する:
+各ループの修正内容を `visual-diff/fix-log.json` に記録する：
 ```json
 [
   {
     "loop": 1,
+    "version": "1.0.0-fse.1",
     "fixes": [
-      { "file": "theme.json", "path": "styles.elements.h1.typography.fontSize", "from": null, "to": "36px", "reason": "h1 font-size diff: 36px vs 32px" },
+      { "file": "theme.json", "path": "styles.elements.h1.typography.fontSize", "from": null, "to": "36px", "reason": "h1 font-size diff: 36px vs 32px — extraction-summary.md 実測値" },
       { "file": "style.css", "added": ".entry-content { margin-top: 40px; }", "reason": "margin-top diff: 40px vs 0px" }
     ],
     "result": { "pixelDiffMax": 4.2, "criticals": 3, "warnings": 8 }
-  },
-  {
-    "loop": 2,
-    "fixes": [...],
-    "result": { "pixelDiffMax": 1.1, "criticals": 0, "warnings": 2 }
   }
 ]
 ```
 
-### Step 9: 出力
+### Step 11: 出力
+
 - 変換結果を `./converted-theme/` ディレクトリに出力（元テーマは変更しない）
-- `CONVERSION_REPORT.md` を生成:
+- `CONVERSION_REPORT.md` を生成：
   - 変換サマリー統計
   - ファイル別変換マッピング表
   - PHPロジック処理結果（カテゴリ別）
   - 未変換・要手動対応項目の詳細と推奨アクション
   - テスト推奨チェックリスト
+- `VISUAL_DIFF_REPORT.md` を最終版として更新
+
+---
+
+## チェックリスト
+
+変換開始時：
+- [ ] `capture-config.json` が設定済み
+- [ ] ステージングに FSE Conversion Helper プラグインが有効
+- [ ] `npm run extract` 実行済み
+- [ ] `extraction-summary.md` を読んだ
+
+theme.json 作成時：
+- [ ] body font-size は実測値（extraction-summary.md）
+- [ ] body color は実測値
+- [ ] body line-height は実測値
+- [ ] contentSize は実測 main 幅
+
+parts/header.html 作成時：
+- [ ] 実DOM の子要素順序と一致
+- [ ] 背景色は実測値
+- [ ] ナビゲーション ID は MCP or PHP で確認済み
+
+front-page.html 作成時：
+- [ ] `wp:post-content` を使っていない（VC/WC依存ページの場合）
+- [ ] 各セクションを FSE ブロックで再構築済み
