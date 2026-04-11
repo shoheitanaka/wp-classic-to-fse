@@ -4,4 +4,6 @@ visual-diff/
 capture-config.json
 converted-theme/
 *.log
-converted-theme.zip
+*.zip
+.claude/mcp.json
+VISUAL_DIFF_REPORT.md
