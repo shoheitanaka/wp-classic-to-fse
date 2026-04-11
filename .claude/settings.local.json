@@ -11,7 +11,9 @@
       "Bash(curl -s -o /dev/null -w '%{http_code}' -H 'Authorization: Basic __TRACKED_VAR__' __TRACKED_VAR__/wp-json/fse-conversion/v1/__TRACKED_VAR__)",
       "Bash(curl -s -H 'Authorization: Basic __TRACKED_VAR__' __TRACKED_VAR__/wp-json/fse-conversion/v1/customizer-export)",
       "Bash(curl -s -H 'Authorization: Basic __TRACKED_VAR__' __TRACKED_VAR__/wp-json/fse-conversion/v1/capture-urls)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c ':*)"
     ]
   }
 }

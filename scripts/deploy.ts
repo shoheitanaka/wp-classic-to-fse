@@ -24,7 +24,10 @@ interface Config {
 const THEME_DIR = path.resolve('./converted-theme');
 const STYLE_CSS = path.join(THEME_DIR, 'style.css');
 const FUNCTIONS_PHP = path.join(THEME_DIR, 'functions.php');
-const ZIP_PATH = path.resolve('./converted-theme.zip');
+// ZIP_NAME must match the theme directory name WordPress will use as stylesheet slug.
+// Using a fixed name prevents WordPress from generating a random suffix each upload.
+const THEME_SLUG = 'antimall-fse';
+const ZIP_PATH = path.resolve(`./${THEME_SLUG}.zip`);
 const CONFIG_PATH = './capture-config.json';
 
 // ─── バージョン管理 ───
@@ -70,7 +73,16 @@ function applyVersion(newVersion: string): void {
 
 function buildZip(): void {
   if (fs.existsSync(ZIP_PATH)) fs.unlinkSync(ZIP_PATH);
-  execSync(`cd "${THEME_DIR}" && zip -r "${ZIP_PATH}" . -x "*.DS_Store" -q`, { stdio: 'inherit' });
+  // Create a temp symlink so ZIP root directory is THEME_SLUG, not ".".
+  // WordPress uses the ZIP root directory name as the theme slug (stylesheet).
+  const tmpLink = path.resolve(`./${THEME_SLUG}`);
+  if (fs.existsSync(tmpLink)) fs.rmSync(tmpLink, { recursive: true, force: true });
+  fs.symlinkSync(THEME_DIR, tmpLink);
+  try {
+    execSync(`zip -r "${ZIP_PATH}" "${THEME_SLUG}" -x "*/.DS_Store" -q`, { stdio: 'inherit' });
+  } finally {
+    fs.rmSync(tmpLink, { force: true });
+  }
 }
 
 function uploadTheme(config: Config): { stylesheet: string; name: string } {
