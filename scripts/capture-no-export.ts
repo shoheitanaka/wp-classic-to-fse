@@ -70,8 +70,56 @@ async function capturePage(page: Page, captureUrl: CaptureUrl, viewport: Viewpor
 
     await page.screenshot({ path: path.join(outputDir, `${baseName}.png`), fullPage: true });
 
+    // Try __FCH_STYLES first; if empty (e.g. FSE theme selectors differ), fall back to
+    // direct getComputedStyle() evaluation so both classic and FSE are compared fairly.
     const styles = await page.evaluate(() => {
-      return (window as any).__FCH_STYLES || {};
+      const injected = (window as any).__FCH_STYLES;
+      if (injected && Object.keys(injected).length > 0) return injected;
+
+      const SELECTORS = [
+        'body',
+        'header', '.site-header', '#masthead',
+        'footer', '.site-footer', '#colophon',
+        'main', '.site-main', '#primary', '#content',
+        'aside', '.widget-area', '#secondary',
+        'nav', '.main-navigation', '.wp-block-navigation',
+        'h1', 'h2', 'h3', 'h4', 'h5', 'p', 'a',
+        '.entry-title', '.entry-content', '.entry-meta',
+        '.widget', '.widget-title',
+        'button', '.wp-block-button__link',
+        'input[type="search"]',
+        '.wp-block-columns', '.wp-block-column',
+        // FSE theme custom classes
+        '.antimall-header', '.antimall-topbar', '.antimall-bottom-bar',
+        '.antimall-footer', '.antimall-footer-top', '.antimall-footer-abs',
+        '.antimall-page-title-wrap', '.antimall-content-wrap', '.antimall-sidebar',
+      ];
+
+      const PROPS = [
+        'font-family', 'font-size', 'font-weight', 'line-height', 'color',
+        'background-color',
+        'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+        'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+        'display', 'position', 'max-width', 'width',
+      ];
+
+      const result: Record<string, Record<string, string>> = {};
+
+      for (const sel of SELECTORS) {
+        const el = document.querySelector(sel);
+        if (!el) continue;
+        const cs = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        const props: Record<string, string> = {};
+        for (const p of PROPS) props[p] = cs.getPropertyValue(p).trim();
+        props['__rect_x']      = String(Math.round(rect.x));
+        props['__rect_y']      = String(Math.round(rect.y));
+        props['__rect_width']  = String(Math.round(rect.width));
+        props['__rect_height'] = String(Math.round(rect.height));
+        result[sel] = props;
+      }
+
+      return result;
     });
     fs.writeFileSync(path.join(outputDir, `${baseName}_styles.json`), JSON.stringify(styles, null, 2));
 

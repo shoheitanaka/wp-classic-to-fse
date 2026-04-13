@@ -40,17 +40,25 @@ interface CaptureUrl {
 
 // 抽出する要素セレクタ（存在する最初のものを使用）
 const KEY_SELECTORS: Record<string, string[]> = {
-  header:     ['header', '#masthead', '.site-header', '#header', '.header'],
-  topbar:     ['.topbar', '.header-top', '.top-bar', '.antimall-topbar', '.header-top-area'],
-  logo:       ['.site-logo', '.logo', '#logo', '.custom-logo-link', '.header-logo'],
-  navigation: ['nav', '.main-navigation', '#site-navigation', '.nav-menu', '.primary-menu'],
-  hero:       ['.hero', '.slider', '.rev_slider_wrapper', '.hero-area', '.banner', '#slider', '.tp-banner'],
-  main:       ['main', '#primary', '.site-main', '#main', '.main-content'],
-  content:    ['.entry-content', '#content', '.content-area', '.post-content'],
-  sidebar:    ['aside', '#secondary', '.widget-area', '.sidebar', '.site-sidebar'],
-  footer:     ['footer', '#colophon', '.site-footer', '#footer'],
-  footer_nav: ['.footer-navigation', '.footer-menu', '.footer-nav'],
-  copyright:  ['.site-info', '.copyright', '.footer-copyright', '.footer-bottom'],
+  header:      ['header', '#masthead', '.site-header', '#header', '.header'],
+  topbar:      ['.topbar', '.header-top', '.top-bar', '.antimall-topbar', '.header-top-area', '.mid-section-wrap'],
+  logo:        ['.site-logo', '.logo', '#logo', '.custom-logo-link', '.header-logo', '.nb-logo'],
+  navigation:  ['nav', '.main-navigation', '#site-navigation', '.nav-menu', '.primary-menu'],
+  hero:        ['.hero', '.slider', '.rev_slider_wrapper', '.hero-area', '.banner', '#slider', '.tp-banner'],
+  // ヘッダーとmainの間にあるタイトルバナー（内部ページで必須）
+  page_title:  ['.nb-page-title-wrap', '.page-title-wrap', '.archive-header', '#page-title', '.page-banner', '.entry-header.page-title'],
+  main:        ['main', '#primary', '.site-main', '#main', '.main-content'],
+  // 個別記事カードの構造（アーカイブ・一覧テンプレート設計用）
+  post_card:   ['article.hentry', '.nb-post-block', '.post-card', 'article.type-post'],
+  // パンくずリスト
+  breadcrumb:  ['.woocommerce-breadcrumb', '.breadcrumb', '.nb-breadcrumb', '.site-breadcrumb'],
+  content:     ['.entry-content', '#content', '.content-area', '.post-content'],
+  // 投稿メタ情報（日付・著者・カテゴリ表示スタイル）
+  entry_meta:  ['.entry-meta', '.post-meta', '.nb-post-meta'],
+  sidebar:     ['aside', '#secondary', '.widget-area', '.sidebar', '.site-sidebar'],
+  footer:      ['footer', '#colophon', '.site-footer', '#footer'],
+  footer_top:  ['.footer-top-section', '.footer-top', '.footer-widgets'],
+  footer_abs:  ['.footer-abs-section', '.footer-bottom', '.site-info', '.footer-copyright'],
 };
 
 function getAuthHeaders(config: Config): Record<string, string> {

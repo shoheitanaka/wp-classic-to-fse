@@ -16,7 +16,8 @@
       "Bash(python3 -c ':*)",
       "Bash(python3:*)",
       "Bash(wait:*)",
-      "Bash(echo \"Capture started in background PID: $!\")"
+      "Bash(echo \"Capture started in background PID: $!\")",
+      "Bash(curl -s \"https://nishikawa.demo01web.info/wp-content/plugins/sitepress-multilingual-cms/templates/language-switchers/legacy-list-horizontal/style.min.css\")"
     ]
   }
 }
